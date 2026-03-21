@@ -380,6 +380,22 @@ export default function DashboardPage() {
     return sortedReminders.filter((entry) => entry.date === today && !entry.taken);
   }, [sortedReminders]);
 
+  const insightData = useMemo(() => {
+    const total = sortedReminders.length;
+    const taken = sortedReminders.filter((entry) => entry.taken).length;
+    const pending = total - taken;
+    const completion = total === 0 ? 0 : Math.round((taken / total) * 100);
+
+    const nowDate = new Date();
+    const nextReminder = sortedReminders
+      .filter((entry) => !entry.taken)
+      .map((entry) => ({ ...entry, at: parseReminderDateTime(entry.date, entry.time) }))
+      .filter((entry) => entry.at.getTime() >= nowDate.getTime())
+      .sort((a, b) => a.at.getTime() - b.at.getTime())[0];
+
+    return { total, taken, pending, completion, nextReminder };
+  }, [sortedReminders]);
+
   const addReminder = async (event) => {
     event.preventDefault();
 
@@ -484,62 +500,105 @@ export default function DashboardPage() {
             <p className="mini-label">Medication planner</p>
             <h1>{`Welcome, ${userName}.`}</h1>
             <p className="muted">Plan medicine reminders with calendar date and exact time.</p>
+          </div>
+          <div className="topbar-right">
             <button type="button" className="logout-btn" onClick={logout}>
               Log out
             </button>
-          </div>
-          <div className="clock-card">
-            <p>{now.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}</p>
-            <strong>{now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</strong>
+            <div className="clock-card">
+              <p>{now.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}</p>
+              <strong>{now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</strong>
+            </div>
           </div>
         </section>
 
         <section className="board-grid">
-          <article className="card calendar-card">
-            <div className="card-head">
-              <h2>Calendar</h2>
-              <div className="month-nav">
-                <button type="button" onClick={() => goToMonth(-1)}>
-                  Prev
-                </button>
-                <strong>{`${MONTHS[currentMonth.getMonth()]} ${currentMonth.getFullYear()}`}</strong>
-                <button type="button" onClick={() => goToMonth(1)}>
-                  Next
-                </button>
-              </div>
-            </div>
-
-            <div className="weekdays">
-              {WEEK_DAYS.map((day) => (
-                <span key={day}>{day}</span>
-              ))}
-            </div>
-
-            <div className="calendar-grid">
-              {calendarCells.map((dayDate, index) => {
-                if (!dayDate) {
-                  return <span className="blank" key={`blank-${index}`} />;
-                }
-
-                const iso = toInputDate(dayDate);
-                const isSelected = iso === selectedDate;
-                const isToday = iso === toInputDate(new Date());
-
-                return (
-                  <button
-                    type="button"
-                    key={iso}
-                    className={`day-btn ${isSelected ? "selected" : ""} ${isToday ? "today" : ""}`}
-                    onClick={() => chooseDateFromCalendar(dayDate)}
-                  >
-                    {dayDate.getDate()}
+          <div className="column-stack">
+            <article className="card calendar-card">
+              <div className="card-head">
+                <h2>Calendar</h2>
+                <div className="month-nav">
+                  <button type="button" onClick={() => goToMonth(-1)}>
+                    Prev
                   </button>
-                );
-              })}
-            </div>
+                  <strong>{`${MONTHS[currentMonth.getMonth()]} ${currentMonth.getFullYear()}`}</strong>
+                  <button type="button" onClick={() => goToMonth(1)}>
+                    Next
+                  </button>
+                </div>
+              </div>
 
-            <div className="selected-date">Selected date: {selectedDate}</div>
-          </article>
+              <div className="weekdays">
+                {WEEK_DAYS.map((day) => (
+                  <span key={day}>{day}</span>
+                ))}
+              </div>
+
+              <div className="calendar-grid">
+                {calendarCells.map((dayDate, index) => {
+                  if (!dayDate) {
+                    return <span className="blank" key={`blank-${index}`} />;
+                  }
+
+                  const iso = toInputDate(dayDate);
+                  const isSelected = iso === selectedDate;
+                  const isToday = iso === toInputDate(new Date());
+
+                  return (
+                    <button
+                      type="button"
+                      key={iso}
+                      className={`day-btn ${isSelected ? "selected" : ""} ${isToday ? "today" : ""}`}
+                      onClick={() => chooseDateFromCalendar(dayDate)}
+                    >
+                      {dayDate.getDate()}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="selected-date">Selected date: {selectedDate}</div>
+            </article>
+
+            <article className="card insights-card">
+              <div className="insights-head">
+                <h2>Adherence insights</h2>
+                <strong>{insightData.completion}%</strong>
+              </div>
+              <div className="insight-bar">
+                <span style={{ width: `${insightData.completion}%` }} />
+              </div>
+
+              <div className="insight-grid">
+                <div>
+                  <p>Total reminders</p>
+                  <strong>{insightData.total}</strong>
+                </div>
+                <div>
+                  <p>Taken</p>
+                  <strong>{insightData.taken}</strong>
+                </div>
+                <div>
+                  <p>Pending</p>
+                  <strong>{insightData.pending}</strong>
+                </div>
+              </div>
+
+              {insightData.nextReminder ? (
+                <p className="next-reminder">
+                  Next: {insightData.nextReminder.name} at{" "}
+                  {insightData.nextReminder.at.toLocaleString([], {
+                    month: "short",
+                    day: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </p>
+              ) : (
+                <p className="next-reminder">No upcoming pending reminder.</p>
+              )}
+            </article>
+          </div>
 
           <article className="card form-card">
             <h2>Add medicine reminder</h2>
@@ -677,6 +736,13 @@ export default function DashboardPage() {
           margin-bottom: 18px;
         }
 
+        .topbar-right {
+          display: grid;
+          gap: 10px;
+          justify-items: end;
+          margin-top: 10px;
+        }
+
         .mini-label {
           margin: 0;
           text-transform: uppercase;
@@ -719,19 +785,8 @@ export default function DashboardPage() {
           letter-spacing: -0.02em;
         }
 
-        .clock-card button {
-          margin-top: 10px;
-          border: none;
-          border-radius: 12px;
-          padding: 9px 12px;
-          background: rgba(90, 147, 255, 0.16);
-          color: #2b4ea9;
-          font-weight: 700;
-          cursor: pointer;
-        }
-
         .logout-btn {
-          margin-top: 14px;
+          margin-top: 0;
           border: none;
           border-radius: 12px;
           padding: 10px 14px;
@@ -746,6 +801,13 @@ export default function DashboardPage() {
           grid-template-columns: 1.05fr 1fr;
           gap: 18px;
           margin-bottom: 18px;
+          align-items: start;
+        }
+
+        .column-stack {
+          display: grid;
+          gap: 18px;
+          align-content: start;
         }
 
         .card {
@@ -755,6 +817,71 @@ export default function DashboardPage() {
           padding: 20px;
           box-shadow: 0 28px 56px rgba(101, 82, 87, 0.14);
           backdrop-filter: blur(8px);
+        }
+
+        .calendar-card {
+          height: fit-content;
+        }
+
+        .insights-head {
+          display: flex;
+          justify-content: space-between;
+          align-items: baseline;
+          margin-bottom: 10px;
+        }
+
+        .insights-head strong {
+          font-size: 1.6rem;
+          color: #ff7f49;
+          letter-spacing: -0.02em;
+        }
+
+        .insight-bar {
+          height: 10px;
+          border-radius: 999px;
+          background: rgba(143, 158, 193, 0.24);
+          overflow: hidden;
+          margin-bottom: 14px;
+        }
+
+        .insight-bar span {
+          display: block;
+          height: 100%;
+          border-radius: 999px;
+          background: linear-gradient(135deg, #ff9f61, #ff7f49);
+          transition: width 0.3s ease;
+        }
+
+        .insight-grid {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 8px;
+          margin-bottom: 10px;
+        }
+
+        .insight-grid div {
+          border: 1px solid rgba(143, 158, 193, 0.24);
+          background: rgba(255, 255, 255, 0.82);
+          border-radius: 12px;
+          padding: 10px;
+        }
+
+        .insight-grid p {
+          margin: 0;
+          font-size: 0.8rem;
+          color: var(--ink-500);
+        }
+
+        .insight-grid strong {
+          display: block;
+          margin-top: 5px;
+          font-size: 1.1rem;
+        }
+
+        .next-reminder {
+          margin: 0;
+          color: var(--ink-700);
+          font-weight: 600;
         }
 
         .card h2 {
