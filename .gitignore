@@ -21,3 +21,23 @@ frontend/.env.local
 # OS
 .DS_Store
 Thumbs.db
+
+# Python cache (additional)
+__pycache__/
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Django
+*.log
+local_settings.py
+backend/staticfiles/
+
+# Frontend
+frontend/.env
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+
+# VS Code
+.vscode/

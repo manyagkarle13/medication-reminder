@@ -17,12 +17,10 @@ http_ece==1.2.1
 idna==3.11
 multidict==6.7.1
 packaging==26.0
-pillow==12.1.1
 propcache==0.4.1
 psycopg2-binary==2.9.11
 py-vapid==1.9.4
 pycparser==3.0
-pytesseract==0.3.13
 python-decouple==3.8
 pywebpush==2.3.0
 requests==2.32.5
