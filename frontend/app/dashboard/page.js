@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 
 const WEEK_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTHS = [
@@ -312,7 +312,7 @@ export default function DashboardPage() {
     return true;
   };
 
-  const autoEnablePush = async () => {
+  const autoEnablePush = useEffectEvent(async () => {
     if (!("Notification" in window)) {
       return;
     }
@@ -339,7 +339,7 @@ export default function DashboardPage() {
     if (permission === "granted") {
       await ensurePushSubscription();
     }
-  };
+  });
 
   useEffect(() => {
     if (!userId) {
