@@ -5,12 +5,17 @@ from django.conf import settings
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
-from .models import Medicine, PushSubscription, User
+from .models import Medicine, MedicineAdherence, PushSubscription, User
 from .push import send_push_to_user
 
 
 def _serialize_medicine(medicine):
     date_value = medicine.date.isoformat() if hasattr(medicine.date, "isoformat") else str(medicine.date)
+    taken_dates = []
+    adherence_logs = getattr(medicine, "_prefetched_objects_cache", {}).get("adherence_logs")
+    if adherence_logs is None:
+        adherence_logs = medicine.adherence_logs.all()
+    taken_dates = [log.date.isoformat() for log in adherence_logs]
     return {
         "id": medicine.id,
         "user_id": medicine.user_id,
@@ -21,6 +26,7 @@ def _serialize_medicine(medicine):
         "frequency": medicine.frequency,
         "notes": medicine.notes,
         "taken": medicine.taken,
+        "taken_dates": taken_dates,
     }
 
 
@@ -105,7 +111,7 @@ def medicines(request):
         return error_response
 
     if request.method == "GET":
-        items = Medicine.objects.filter(user=user)
+        items = Medicine.objects.filter(user=user).prefetch_related("adherence_logs")
         return Response([_serialize_medicine(item) for item in items])
 
     name = (request.data.get("name") or "").strip()
@@ -154,6 +160,14 @@ def medicine_detail(request, medicine_id):
 
     updatable_fields = ["name", "dosage", "date", "time", "frequency", "notes", "taken"]
     changed_fields = []
+    occurrence_date_value = request.data.get("occurrence_date")
+    occurrence_date = None
+
+    if occurrence_date_value not in (None, ""):
+        try:
+            occurrence_date = datetime.strptime(str(occurrence_date_value), "%Y-%m-%d").date()
+        except ValueError:
+            return Response({"error": "occurrence_date must be YYYY-MM-DD"}, status=400)
 
     for field in updatable_fields:
         if field not in request.data:
@@ -162,8 +176,25 @@ def medicine_detail(request, medicine_id):
         value: Any = request.data.get(field)
 
         if field == "taken":
-            medicine.taken = _to_bool(value)
-            changed_fields.append("taken")
+            taken_value = _to_bool(value)
+            if occurrence_date:
+                if taken_value:
+                    MedicineAdherence.objects.get_or_create(
+                        medicine=medicine,
+                        date=occurrence_date,
+                    )
+                else:
+                    MedicineAdherence.objects.filter(
+                        medicine=medicine,
+                        date=occurrence_date,
+                    ).delete()
+
+                if medicine.frequency == "once" and occurrence_date == medicine.date:
+                    medicine.taken = taken_value
+                    changed_fields.append("taken")
+            else:
+                medicine.taken = taken_value
+                changed_fields.append("taken")
             continue
 
         text_value = "" if value is None else str(value).strip()
@@ -206,6 +237,7 @@ def medicine_detail(request, medicine_id):
     if changed_fields:
         medicine.save(update_fields=changed_fields)
 
+    medicine = Medicine.objects.prefetch_related("adherence_logs").get(id=medicine.id)
     return Response(_serialize_medicine(medicine))
 
 

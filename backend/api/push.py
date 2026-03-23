@@ -41,10 +41,13 @@ def push_available():
     )
 
 
-def _should_send_now(medicine, now_local):
-    if medicine.taken:
-        return False
+def _is_taken_for_date(medicine, target_date):
+    if medicine.frequency == "once":
+        return medicine.taken
+    return medicine.adherence_logs.filter(date=target_date).exists()
 
+
+def _should_send_now(medicine, now_local):
     try:
         reminder_time = datetime.strptime(medicine.time, "%H:%M").time()
     except ValueError:
@@ -60,6 +63,9 @@ def _should_send_now(medicine, now_local):
             return False
 
     if medicine.frequency == "weekdays" and now_local.weekday() > 4:
+        return False
+
+    if _is_taken_for_date(medicine, today):
         return False
 
     if medicine.last_notified_date == today:
@@ -123,7 +129,7 @@ def send_due_reminders_tick():
     now_local = timezone.localtime()
     meds = (
         Medicine.objects.select_related("user")
-        .filter(taken=False)
+        .prefetch_related("adherence_logs")
         .exclude(time="")
     )
     today = now_local.date()

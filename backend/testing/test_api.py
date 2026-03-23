@@ -2,7 +2,7 @@ from unittest.mock import patch
 
 from django.test import Client, TestCase
 
-from api.models import Medicine, PushSubscription, User
+from api.models import Medicine, MedicineAdherence, PushSubscription, User
 
 
 class AuthApiTests(TestCase):
@@ -101,6 +101,33 @@ class MedicineApiTests(TestCase):
         self.assertEqual(response.status_code, 200)
         medicine.refresh_from_db()
         self.assertTrue(medicine.taken)
+
+    def test_patch_updates_taken_status_for_specific_occurrence_date(self):
+        medicine = Medicine.objects.create(
+            user=self.user,
+            name="Vitamin D",
+            dosage="1 capsule",
+            date="2026-03-20",
+            time="09:00",
+            frequency="daily",
+        )
+
+        response = self.client.patch(
+            f"/api/medicines/{medicine.id}/?user_id={self.user.id}",
+            data='{"occurrence_date": "2026-03-23", "taken": true}',
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(
+            MedicineAdherence.objects.filter(
+                medicine=medicine,
+                date="2026-03-23",
+            ).exists()
+        )
+        self.assertEqual(response.json()["taken_dates"], ["2026-03-23"])
+        medicine.refresh_from_db()
+        self.assertFalse(medicine.taken)
 
     def test_delete_requires_matching_user(self):
         other_user = User.objects.create(

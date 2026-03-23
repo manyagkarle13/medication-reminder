@@ -32,32 +32,44 @@ function parseReminderDateTime(dateText, timeText) {
   return new Date(year, month - 1, day, hour, minute, 0, 0);
 }
 
-function reminderAppliesToday(entry, nowDate) {
-  const start = parseReminderDateTime(entry.date, entry.time);
-  const todayAtReminderTime = new Date(
-    nowDate.getFullYear(),
-    nowDate.getMonth(),
-    nowDate.getDate(),
-    start.getHours(),
-    start.getMinutes(),
-    0,
-    0,
-  );
+function reminderAppliesOnDate(entry, dateText) {
+  if (!dateText) {
+    return false;
+  }
 
-  if (todayAtReminderTime.getTime() < start.getTime()) {
+  const targetDate = new Date(`${dateText}T00:00:00`);
+  const start = new Date(`${entry.date}T00:00:00`);
+  if (Number.isNaN(targetDate.getTime()) || Number.isNaN(start.getTime())) {
+    return false;
+  }
+
+  if (targetDate.getTime() < start.getTime()) {
     return false;
   }
 
   if (entry.frequency === "weekdays") {
-    const day = nowDate.getDay();
+    const day = targetDate.getDay();
     return day >= 1 && day <= 5;
   }
 
   if (entry.frequency === "once") {
-    return toInputDate(nowDate) === entry.date;
+    return dateText === entry.date;
   }
 
   return true;
+}
+
+function isReminderTakenOnDate(entry, dateText) {
+  if (!dateText) {
+    return false;
+  }
+
+  const takenDates = Array.isArray(entry.taken_dates) ? entry.taken_dates : [];
+  if (takenDates.includes(dateText)) {
+    return true;
+  }
+
+  return entry.frequency === "once" && entry.date === dateText && Boolean(entry.taken);
 }
 
 function urlBase64ToUint8Array(base64String) {
@@ -237,7 +249,11 @@ export default function DashboardPage() {
     const tick = () => {
       const nowDate = new Date();
       reminders.forEach((entry) => {
-        if (entry.taken || !reminderAppliesToday(entry, nowDate)) {
+        const todayText = toInputDate(nowDate);
+        if (
+          isReminderTakenOnDate(entry, todayText) ||
+          !reminderAppliesOnDate(entry, todayText)
+        ) {
           return;
         }
 
@@ -375,26 +391,82 @@ export default function DashboardPage() {
     });
   }, [reminders]);
 
-  const todaysReminders = useMemo(() => {
+  const selectedDateLabel = useMemo(() => {
+    if (!selectedDate) {
+      return "";
+    }
+
+    const selected = new Date(`${selectedDate}T00:00:00`);
+    return selected.toLocaleDateString([], {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  }, [selectedDate]);
+
+  const remindersForSelectedDate = useMemo(() => {
+    return sortedReminders
+      .filter((entry) => reminderAppliesOnDate(entry, selectedDate))
+      .map((entry) => ({
+        ...entry,
+        dayDateTime: parseReminderDateTime(selectedDate, entry.time),
+        isTakenForSelectedDate: isReminderTakenOnDate(entry, selectedDate),
+      }))
+      .sort((a, b) => a.dayDateTime.getTime() - b.dayDateTime.getTime());
+  }, [selectedDate, sortedReminders]);
+
+  const todayPendingCount = useMemo(() => {
     const today = toInputDate(new Date());
-    return sortedReminders.filter((entry) => entry.date === today && !entry.taken);
-  }, [sortedReminders]);
+    return reminders
+      .filter((entry) => reminderAppliesOnDate(entry, today))
+      .filter((entry) => !isReminderTakenOnDate(entry, today)).length;
+  }, [reminders]);
 
   const insightData = useMemo(() => {
-    const total = sortedReminders.length;
-    const taken = sortedReminders.filter((entry) => entry.taken).length;
+    const total = remindersForSelectedDate.length;
+    const taken = remindersForSelectedDate.filter((entry) => entry.isTakenForSelectedDate).length;
     const pending = total - taken;
     const completion = total === 0 ? 0 : Math.round((taken / total) * 100);
 
-    const nowDate = new Date();
-    const nextReminder = sortedReminders
-      .filter((entry) => !entry.taken)
-      .map((entry) => ({ ...entry, at: parseReminderDateTime(entry.date, entry.time) }))
-      .filter((entry) => entry.at.getTime() >= nowDate.getTime())
-      .sort((a, b) => a.at.getTime() - b.at.getTime())[0];
+    const isSelectedToday = selectedDate === toInputDate(new Date());
+    const compareTime = isSelectedToday ? new Date() : new Date(`${selectedDate}T00:00:00`);
+    const nextReminder = remindersForSelectedDate
+      .filter((entry) => !entry.isTakenForSelectedDate)
+      .filter((entry) => entry.dayDateTime.getTime() >= compareTime.getTime())
+      .sort((a, b) => a.dayDateTime.getTime() - b.dayDateTime.getTime())[0];
 
     return { total, taken, pending, completion, nextReminder };
-  }, [sortedReminders]);
+  }, [remindersForSelectedDate, selectedDate]);
+
+  const daySummaries = useMemo(() => {
+    const summary = {};
+    reminders.forEach((entry) => {
+      const start = new Date(`${entry.date}T00:00:00`);
+      if (Number.isNaN(start.getTime())) {
+        return;
+      }
+
+      const year = currentMonth.getFullYear();
+      const month = currentMonth.getMonth();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+      for (let day = 1; day <= daysInMonth; day += 1) {
+        const dateText = toInputDate(new Date(year, month, day));
+        if (!reminderAppliesOnDate(entry, dateText)) {
+          continue;
+        }
+
+        if (!summary[dateText]) {
+          summary[dateText] = { total: 0, taken: 0 };
+        }
+        summary[dateText].total += 1;
+        if (isReminderTakenOnDate(entry, dateText)) {
+          summary[dateText].taken += 1;
+        }
+      }
+    });
+    return summary;
+  }, [currentMonth, reminders]);
 
   const addReminder = async (event) => {
     event.preventDefault();
@@ -441,13 +513,16 @@ export default function DashboardPage() {
       return;
     }
 
+    const nextTakenValue = !isReminderTakenOnDate(currentEntry, selectedDate);
+
     try {
       const response = await fetch(`${API_BASE}/medicines/${id}/`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           user_id: userId,
-          taken: !currentEntry.taken,
+          occurrence_date: selectedDate,
+          taken: nextTakenValue,
         }),
       });
       const data = await response.json();
@@ -543,15 +618,24 @@ export default function DashboardPage() {
                   const iso = toInputDate(dayDate);
                   const isSelected = iso === selectedDate;
                   const isToday = iso === toInputDate(new Date());
+                  const daySummary = daySummaries[iso];
+                  const hasEntries = Boolean(daySummary?.total);
+                  const allTaken = hasEntries && daySummary.taken === daySummary.total;
+                  const partiallyTaken = hasEntries && daySummary.taken > 0 && daySummary.taken < daySummary.total;
 
                   return (
                     <button
                       type="button"
                       key={iso}
-                      className={`day-btn ${isSelected ? "selected" : ""} ${isToday ? "today" : ""}`}
+                      className={`day-btn ${isSelected ? "selected" : ""} ${isToday ? "today" : ""} ${hasEntries ? "has-entries" : ""} ${allTaken ? "all-taken" : ""} ${partiallyTaken ? "partial-taken" : ""}`}
                       onClick={() => chooseDateFromCalendar(dayDate)}
                     >
                       {dayDate.getDate()}
+                      {hasEntries && (
+                        <span className="day-pill">
+                          {daySummary.taken}/{daySummary.total}
+                        </span>
+                      )}
                     </button>
                   );
                 })}
@@ -587,7 +671,7 @@ export default function DashboardPage() {
               {insightData.nextReminder ? (
                 <p className="next-reminder">
                   Next: {insightData.nextReminder.name} at{" "}
-                  {insightData.nextReminder.at.toLocaleString([], {
+                  {insightData.nextReminder.dayDateTime.toLocaleString([], {
                     month: "short",
                     day: "numeric",
                     hour: "2-digit",
@@ -671,30 +755,37 @@ export default function DashboardPage() {
 
         <section className="list-row">
           <article className="card summary-card">
-            <h2>Today</h2>
-            <p className="summary-number">{todaysReminders.length}</p>
-            <p className="muted">upcoming reminders left today</p>
+            <h2>{selectedDate === toInputDate(new Date()) ? "Today" : "Selected day"}</h2>
+            <p className="summary-number">{insightData.pending}</p>
+            <p className="muted">
+              {selectedDate === toInputDate(new Date())
+                ? "pending reminders left today"
+                : `pending reminders for ${selectedDateLabel}`}
+            </p>
+            <p className="summary-meta">{`${insightData.taken}/${insightData.total} completed on ${selectedDateLabel || selectedDate}`}</p>
           </article>
 
           <article className="card list-card">
-            <h2>Scheduled reminders</h2>
+            <h2>{`Scheduled reminders for ${selectedDateLabel || selectedDate}`}</h2>
             {isLoadingReminders ? (
               <p className="muted">Loading reminders...</p>
-            ) : sortedReminders.length === 0 ? (
+            ) : reminders.length === 0 ? (
               <p className="muted">No reminders yet. Add your first medicine above.</p>
+            ) : remindersForSelectedDate.length === 0 ? (
+              <p className="muted">No reminders are scheduled for this date.</p>
             ) : (
               <ul className="reminder-list">
-                {sortedReminders.map((entry) => (
-                  <li key={entry.id} className={entry.taken ? "taken" : ""}>
+                {remindersForSelectedDate.map((entry) => (
+                  <li key={`${entry.id}-${selectedDate}`} className={entry.isTakenForSelectedDate ? "taken" : ""}>
                     <div>
                       <strong>{entry.name}</strong>
                       <p>{entry.dosage || "Dosage not specified"}</p>
-                      <small>{`${entry.date} at ${entry.time} | ${entry.frequency}`}</small>
+                      <small>{`${selectedDate} at ${entry.time} | ${entry.frequency}`}</small>
                       {entry.notes && <small>{entry.notes}</small>}
                     </div>
                     <div className="actions">
                       <button type="button" onClick={() => toggleTaken(entry.id)}>
-                        {entry.taken ? "Undo" : "Mark taken"}
+                        {entry.isTakenForSelectedDate ? "Undo" : "Mark taken"}
                       </button>
                       <button type="button" className="danger" onClick={() => removeReminder(entry.id)}>
                         Delete
@@ -943,6 +1034,7 @@ export default function DashboardPage() {
         }
 
         .day-btn {
+          position: relative;
           height: 40px;
           border: 1px solid rgba(143, 158, 193, 0.26);
           background: rgba(255, 255, 255, 0.9);
@@ -956,10 +1048,36 @@ export default function DashboardPage() {
           border-color: rgba(90, 147, 255, 0.56);
         }
 
+        .day-btn.has-entries {
+          min-height: 54px;
+          padding-bottom: 14px;
+        }
+
         .day-btn.selected {
           background: linear-gradient(135deg, #ff9f61, #ff8041);
           color: #fff;
           border-color: transparent;
+        }
+
+        .day-btn.all-taken {
+          box-shadow: inset 0 -4px 0 rgba(55, 168, 106, 0.24);
+        }
+
+        .day-btn.partial-taken {
+          box-shadow: inset 0 -4px 0 rgba(255, 159, 97, 0.3);
+        }
+
+        .day-pill {
+          position: absolute;
+          left: 50%;
+          bottom: 5px;
+          transform: translateX(-50%);
+          font-size: 0.63rem;
+          line-height: 1;
+          padding: 2px 5px;
+          border-radius: 999px;
+          background: rgba(31, 43, 68, 0.08);
+          color: inherit;
         }
 
         .selected-date {
@@ -1035,6 +1153,12 @@ export default function DashboardPage() {
           line-height: 1;
           color: #ff7f49;
           font-weight: 800;
+        }
+
+        .summary-meta {
+          margin: 10px 0 0;
+          color: var(--ink-700);
+          font-weight: 600;
         }
 
         .reminder-list {

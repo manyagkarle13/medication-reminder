@@ -28,6 +28,25 @@ class Medicine(models.Model):
         ordering = ["date", "time", "id"]
 
 
+class MedicineAdherence(models.Model):
+    medicine = models.ForeignKey(
+        Medicine,
+        on_delete=models.CASCADE,
+        related_name="adherence_logs",
+    )
+    date = models.DateField()
+    taken_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["date", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["medicine", "date"],
+                name="unique_medicine_adherence_per_day",
+            )
+        ]
+
+
 class PushSubscription(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="push_subscriptions")
     endpoint = models.TextField(unique=True)
