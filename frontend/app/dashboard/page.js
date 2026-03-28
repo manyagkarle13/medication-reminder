@@ -17,7 +17,7 @@ const MONTHS = [
   "November",
   "December",
 ];
-const API_BASE = "http://127.0.0.1:8000/api";
+const API_BASE = "http://18.61.44.172/api";
 
 function toInputDate(date) {
   const y = date.getFullYear();
