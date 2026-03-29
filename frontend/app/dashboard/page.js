@@ -513,15 +513,18 @@ export default function DashboardPage() {
     const nextTakenValue = !isReminderTakenOnDate(currentEntry, selectedDate);
 
     try {
-      const response = await fetch(`${API_BASE}/medicines/${id}/`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          user_id: userId,
-          occurrence_date: selectedDate,
-          taken: nextTakenValue,
-        }),
-      });
+      const response = await fetch(
+        `${API_BASE}/medicines/${id}/?user_id=${encodeURIComponent(userId)}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            user_id: userId,
+            occurrence_date: selectedDate,
+            taken: nextTakenValue,
+          }),
+        },
+      );
       const data = await response.json();
       if (!response.ok) {
         throw new Error(data.error || "Could not update reminder");
