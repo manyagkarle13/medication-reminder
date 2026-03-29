@@ -1,5 +1,5 @@
 "use client";
-
+import { requestNotificationPermission } from "@/lib/notifications";
 import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 
 const WEEK_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -131,12 +131,6 @@ export default function DashboardPage() {
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
-    if (!("Notification" in window)) {
-      return;
-    }
   }, []);
 
   useEffect(() => {
@@ -351,8 +345,11 @@ export default function DashboardPage() {
     }
 
     localStorage.setItem(promptKey, "1");
-    const permission = await Notification.requestPermission();
-    if (permission === "granted") {
+    const token = await requestNotificationPermission();
+    if (Notification.permission === "granted") {
+      if (token) {
+        console.log("Firebase notification token ready.");
+      }
       await ensurePushSubscription();
     }
   });
