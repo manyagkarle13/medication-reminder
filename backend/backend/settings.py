@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
+import os
 from pathlib import Path
 from decouple import config
 import dj_database_url
@@ -121,7 +122,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
-
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 VAPID_PUBLIC_KEY = "BMhBGQEyyY-PltLXaN-fUrsBOYgCRaMvYLTLKNJpuWPhsMJpXXxbKqnHfkbkLnFVwM_NywSIYHPdanfL_kAmxks"
 VAPID_PRIVATE_KEY = "lUZ8XCZBuYGV_5_5nLjoHQrj95aiLSyDWIPIaGdV6WE"
 VAPID_ADMIN_EMAIL = "mailto:admin@medireminder.local"
