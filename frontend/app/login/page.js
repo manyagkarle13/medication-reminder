@@ -23,7 +23,7 @@ export default function Login() {
   };
 
   const login = async () => {
-    const res = await fetch("http://18.61.44.172/api/login/", {
+    const res = await fetch("http://127.0.0.1:8000/api/login/", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
@@ -46,7 +46,7 @@ export default function Login() {
     }
 
     const decoded = jwtDecode(credentialResponse.credential);
-    const res = await fetch("http://18.61.44.172/api/google-login/", {
+    const res = await fetch("http://127.0.0.1:8000/api/google-login/", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

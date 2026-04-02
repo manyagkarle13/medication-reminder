@@ -1,5 +1,4 @@
 "use client";
-import { requestNotificationPermission } from "@/lib/notifications";
 import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 
 const WEEK_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -17,7 +16,7 @@ const MONTHS = [
   "November",
   "December",
 ];
-const API_BASE = "http://18.61.44.172/api";
+const API_BASE = "http://127.0.0.1:8000/api";
 
 function toInputDate(date) {
   const y = date.getFullYear();
@@ -345,11 +344,8 @@ export default function DashboardPage() {
     }
 
     localStorage.setItem(promptKey, "1");
-    const token = await requestNotificationPermission();
+    await Notification.requestPermission();
     if (Notification.permission === "granted") {
-      if (token) {
-        console.log("Firebase notification token ready.");
-      }
       await ensurePushSubscription();
     }
   });
@@ -411,13 +407,6 @@ export default function DashboardPage() {
       }))
       .sort((a, b) => a.dayDateTime.getTime() - b.dayDateTime.getTime());
   }, [selectedDate, sortedReminders]);
-
-  const todayPendingCount = useMemo(() => {
-    const today = toInputDate(new Date());
-    return reminders
-      .filter((entry) => reminderAppliesOnDate(entry, today))
-      .filter((entry) => !isReminderTakenOnDate(entry, today)).length;
-  }, [reminders]);
 
   const insightData = useMemo(() => {
     const total = remindersForSelectedDate.length;
