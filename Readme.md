@@ -1,8 +1,7 @@
 # 💊 Medication Reminder App
 
-> The Medication Reminder App helps users manage their daily medication schedule and receive 
-timely browser push notifications. Built as a full-stack 
-web application with a Django REST API backend and a Next.js frontend.
+> The Medication Reminder App helps users manage their daily medication schedule and receive timely browser push notifications when the tab is in the background. Built as a full-stack web application with a Django REST API backend and a Next.js frontend.
+
 
 ---
 
