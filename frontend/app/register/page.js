@@ -5,6 +5,7 @@ import { jwtDecode } from "jwt-decode";
 import { useState } from "react";
 
 import AuthPageShell from "../../components/AuthPageShell";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE;
 
 export default function Register() {
   const [name, setName] = useState("");

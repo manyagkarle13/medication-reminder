@@ -6,6 +6,7 @@ import { useState } from "react";
 
 import AuthPageShell from "../../components/AuthPageShell";
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE;
+
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
