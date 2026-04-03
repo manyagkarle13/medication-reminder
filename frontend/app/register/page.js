@@ -24,7 +24,7 @@ export default function Register() {
   };
 
   const register = async () => {
-    const res = await fetch("http://127.0.0.1:8000/api/register/", {
+    const res = await fetch(`${API_BASE}/register/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name, email, password }),
@@ -47,7 +47,7 @@ export default function Register() {
     }
 
     const decoded = jwtDecode(credentialResponse.credential);
-    const res = await fetch("http://127.0.0.1:8000/api/google-login/", {
+    const res = await fetch(`${API_BASE}/google-login/`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

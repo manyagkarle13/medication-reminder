@@ -5,7 +5,7 @@ import { jwtDecode } from "jwt-decode";
 import { useState } from "react";
 
 import AuthPageShell from "../../components/AuthPageShell";
-
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE;
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -23,7 +23,7 @@ export default function Login() {
   };
 
   const login = async () => {
-    const res = await fetch("http://127.0.0.1:8000/api/login/", {
+    const res = await fetch(`${API_BASE}/login/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
@@ -46,7 +46,7 @@ export default function Login() {
     }
 
     const decoded = jwtDecode(credentialResponse.credential);
-    const res = await fetch("http://127.0.0.1:8000/api/google-login/", {
+    const res = await fetch(`${API_BASE}/google-login/`,  {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
