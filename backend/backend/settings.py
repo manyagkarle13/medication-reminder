@@ -56,13 +56,17 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
-CORS_ALLOW_ALL_ORIGINS = True
+
 CORS_ALLOW_CREDENTIALS = True
+
+CORS_ALLOWED_ORIGINS = [
+    "https://medication-frontend-0bj3.onrender.com",
+]
+
 CSRF_TRUSTED_ORIGINS = [
     "https://medication-frontend-0bj3.onrender.com",
 ]
-cors_origins = str(config('CORS_ALLOWED_ORIGINS', default='http://localhost:3000'))
-CORS_ALLOWED_ORIGINS: list = cors_origins.split(',')
+
 ROOT_URLCONF = 'backend.urls'
 
 TEMPLATES = [
