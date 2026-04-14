@@ -23,7 +23,6 @@
 - 📊 Medicine adherence tracking with history logs
 - 🔔 Browser Push Notifications via Web Push (VAPID) — works in background
 - ⚙️ Service Worker for background notification delivery
-- 📷 OCR upload support for prescription reading
 - 📱 Fully responsive UI
 
 ---
